@@ -6,8 +6,7 @@ var wrench = require('wrench');
 
 var pkg = require('../package.json');
 var git = require('../lib/git');
-
-var copy = require('../lib/util').copy;
+var util = require('../lib/util');
 
 function getCacheDir() {
   return path.join('.grunt', pkg.name);
@@ -72,8 +71,10 @@ module.exports = function(grunt) {
       dotfiles: false,
       branch: 'gh-pages',
       remote: 'origin',
-      base: process.cwd(),
+      base: './',
       only: '.',
+      move: [],
+      replace: [],
       push: true,
       message: 'Updates',
       silent: false
@@ -104,8 +105,6 @@ module.exports = function(grunt) {
     if (!Array.isArray(files) || files.length === 0) {
       grunt.fatal(new Error('Files must be provided in the "src" property.'));
     }
-
-    var only = grunt.file.expand({cwd: options.base}, options.only);
 
     var done = this.async();
 
@@ -156,14 +155,66 @@ module.exports = function(grunt) {
         .then(function() {
           if (!options.add) {
             log('Removing files');
-            return git.rm(only.join(' '), options.clone);
+            var only = grunt.file.expand(
+                {cwd: options.clone, filter: 'isFile'}, options.only);
+            if(only.length <= 0) {
+              return Q.resolve();
+            }
+            return git.rm(only, options.clone);
           } else {
             return Q.resolve();
           }
         })
         .then(function() {
           log('Copying files');
-          return copy(files, options.base, options.clone);
+          return util.copy(files, options.base, options.clone);
+        })        
+        .then(function() {
+          if(options.move) {
+            log('Moving files around');
+            if(!Array.isArray(options.move)) {
+              options.move = [options.move];
+            }
+            var moveFiles = [];
+            options.move.forEach(function(move) {
+              moveFiles.push({
+                files: grunt.file.expand({
+                  filter: 'isFile',
+                  cwd: path.join(options.clone, move.base),
+                  dot: options.dotfiles
+                  }, move.src),
+                base: path.join(options.clone, move.base),
+                dest: path.join(options.clone, move.dest)})
+            });
+            return util.multiCopy(moveFiles, true);
+          }
+        })
+        .then(function() {
+          if (options.replace) {
+            log('Replacing strings');
+            kind = grunt.util.kindOf(options.replace);
+            if (kind === 'object') {
+              options.replace = [options.replace];
+            }
+            else if (kind !== 'array') {
+              log('options.replace should be an object or an array of objects');
+              return;
+            }
+            var replaceList = [];
+            options.replace.forEach(function(replaceOptions) {
+              replaceList.push({
+                  files: grunt.file.expand(
+                    {cwd: options.clone, filter: 'isFile' },
+                    replaceOptions.files),
+                  base: options.clone,
+                  regex: replaceOptions.regex,
+                  replacement: replaceOptions.replacement
+              });
+            });
+            return util.replaceInFiles(replaceList);
+          } else {
+            return Q.resolve();
+          }
         })
         .then(function() {
           log('Adding all');

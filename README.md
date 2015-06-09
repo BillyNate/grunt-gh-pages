@@ -198,6 +198,31 @@ grunt.initConfig({
 });
 ```
 
+#### <a id="optionsonly">options.replace</a>
+ * type: `object` or `array of objects`
+ * default: empty array
+
+Apply a text replace on specified files (once copied to the destination branch) using a regular expression. This comes in handy when using files in a different folder of the source branch compared to the destination branch.
+
+The objects need to contain three attributes: `files` (a string or an array of strings listing the files), `regex` (the regular expression used for replacing) and `replacement` (the replacement string).
+
+Example of the `replace` option:
+
+```js
+/**
+ * The task below will replace '../build/js' for 'js' in the index.html file.
+ */
+grunt.initConfig({
+  'gh-pages': {
+    options: {
+      base: 'build',
+      replace: { files: 'index.html', regex: /\.\.\/build\/js/g, replacement: 'js' }
+    },
+    src: '**/*'
+  }
+});
+```
+
 #### <a id="optionsrepo">options.repo</a>
  * type: `string`
  * default: url for the origin remote of the current dir (assumes a git repository)
@@ -244,6 +269,33 @@ grunt.initConfig({
       base: 'build',
       branch: 'master',
       repo: 'https://example.com/other/repo.git'
+    },
+    src: '**/*'
+  }
+});
+```
+
+
+#### <a id="optionsmove">options.move</a>
+ * type: `object` or `array of objects`
+ * default: empty array
+
+Move files around in the cloned repository. This will be done after the files have been copied from the source directory and before adding the files to git.
+Each object should contain three attributes: `base`, `src` and `dest`.
+`base` is the base directory to move the files from.
+`src` selects the files to move.
+`dest` is the destination directory to move the files to.
+
+Example use of the `move` option:
+
+```js
+/**
+ * This task moves all `.js` files in `build/js/` to `demo/js/` while keeping the directory structure within `js` intact.
+ */
+grunt.initConfig({
+  'gh-pages': {
+    options: {
+      move: [{base: 'build/', src: 'js/**/*.js', dest: 'demo/'}]
     },
     src: '**/*'
   }
